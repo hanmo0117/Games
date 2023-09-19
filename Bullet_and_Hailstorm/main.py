@@ -5,6 +5,7 @@ import time
 import os
 import math
 from pygame.sprite import Sprite
+import asyncio
 
 
 # 常數
@@ -2129,304 +2130,308 @@ pygame.mixer.music.set_endevent(music_end_event)
 frame_counter = 0  # 每次遊戲循環給計數器加 1
 collision_check_threshold = 3  # 設定成每 3 幀檢查一次碰撞，減少碰撞判斷的計算次數
 
-while running:
-    if show_init:  # 判斷是否顯示起始畫面
-        draw_note()  # 提醒使用者要切換鍵盤語言
-        draw_init()  # 先畫出起始 UI
-        draw_tutorial() # 操作教學
+async def main():
+    global running, show_init, all_sprites, small_enemies, middle_enemies, big_enemies, blocks, frame_counter, line_frame_count, bullets, barrages, bl, player_group, items, player, item_make, dead, paused, win_game
 
-        play_note = False
-        play_tutorial = False
+    while running:
+        if show_init:  # 判斷是否顯示起始畫面
+            draw_note()  # 提醒使用者要切換鍵盤語言
+            draw_init()  # 先畫出起始 UI
+            draw_tutorial() # 操作教學
 
-        level = 1  # 用來改變關卡，同時此變數會改變敵機的生成方式
-        small_death = 0
-        middle_death = 0
-        middle_make = False  # 小型敵機死一定數量就會生成中型敵機
-        big_make = False  # 中型敵機死一定數量就會生成大型敵機
+            play_note = False
+            play_tutorial = False
 
-        all_sprites = pygame.sprite.Group()
-        player_group = pygame.sprite.Group()
-        small_enemies = pygame.sprite.Group()
-        middle_enemies = pygame.sprite.Group()
-        big_enemies = pygame.sprite.Group()
-        bullets = pygame.sprite.Group()
-        barrages = pygame.sprite.Group()
-        blocks = pygame.sprite.Group()
-        items = pygame.sprite.Group()
+            level = 1  # 用來改變關卡，同時此變數會改變敵機的生成方式
+            small_death = 0
+            middle_death = 0
+            middle_make = False  # 小型敵機死一定數量就會生成中型敵機
+            big_make = False  # 中型敵機死一定數量就會生成大型敵機
 
-        show_init = False
-        dead = False
+            all_sprites = pygame.sprite.Group()
+            player_group = pygame.sprite.Group()
+            small_enemies = pygame.sprite.Group()
+            middle_enemies = pygame.sprite.Group()
+            big_enemies = pygame.sprite.Group()
+            bullets = pygame.sprite.Group()
+            barrages = pygame.sprite.Group()
+            blocks = pygame.sprite.Group()
+            items = pygame.sprite.Group()
 
-        player = Player()
-        all_sprites.add(player)
-        player_group.add(player)
+            show_init = False
+            dead = False
 
-        pygame.mixer.music.stop()
+            player = Player()
+            all_sprites.add(player)
+            player_group.add(player)
 
-        new_small(level)  # 每次遊戲的最開始都會有一個小型敵機出現
+            pygame.mixer.music.stop()
 
-    clock.tick(FPS)  # 固定 FPS 控制畫面的切換
-    # 到這裡為止都算遊戲的初始化
+            new_small(level)  # 每次遊戲的最開始都會有一個小型敵機出現
 
-    # ******取得輸入******
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_p:
-                paused = not paused  # 切換 pause 狀態
-        if event.type == music_end_event:
-            play_music = True
+        clock.tick(FPS)  # 固定 FPS 控制畫面的切換
+        # 到這裡為止都算遊戲的初始化
 
-    keys = pygame.key.get_pressed()
-    if keys[pygame.K_SPACE]:
-        player.shoot()
+        # ******取得輸入******
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_p:
+                    paused = not paused  # 切換 pause 狀態
+            if event.type == music_end_event:
+                play_music = True
 
-    # ******更新遊戲******
-    play_bgm()
+        keys = pygame.key.get_pressed()
+        if keys[pygame.K_SPACE]:
+            player.shoot()
 
-    for small_enemy in small_enemies:
-        small_enemy.shoot()
+        # ******更新遊戲******
+        play_bgm()
 
-    for middle_enemy in middle_enemies:
-        middle_enemy.shoot(player)
+        for small_enemy in small_enemies:
+            small_enemy.shoot()
 
-    for big_enemy in big_enemies:
-        big_enemy.shoot(player)
+        for middle_enemy in middle_enemies:
+            middle_enemy.shoot(player)
 
-    if not show_init and not dead and paused:  # 判斷是否顯示暫停畫面
-        draw_pause()  # 暫停 UI
+        for big_enemy in big_enemies:
+            big_enemy.shoot(player)
 
-    if player.lives <= 0:  # 玩家生命值低於零
-        player.kill()
-        dead = True
+        if not show_init and not dead and paused:  # 判斷是否顯示暫停畫面
+            draw_pause()  # 暫停 UI
 
-    if not show_init and dead:  # 判斷玩家是否死亡
-        draw_dead()
+        if player.lives <= 0:  # 玩家生命值低於零
+            player.kill()
+            dead = True
 
-    if not win_game:
-        if len(small_enemies) < (level if level <= 2 else 2):  # 限制畫面中小型敵機的生成數量
-            for i in range(0, random.randrange(1, 3), 1):
-                new_small(level)
-        if len(small_enemies) >= 3 or big_enemies:
-            if len(items) <= 1:
-                item_make = True
-        block_check()
+        if not show_init and dead:  # 判斷玩家是否死亡
+            draw_dead()
 
-        if middle_make:
-            new_middle(level)
-            middle_make = False
-        if big_make:
-            new_big()
-            big_make = False
-        if item_make:
-            new_item()
-            item_make = False
+        if not win_game:
+            if len(small_enemies) < (level if level <= 2 else 2):  # 限制畫面中小型敵機的生成數量
+                for i in range(0, random.randrange(1, 3), 1):
+                    new_small(level)
+            if len(small_enemies) >= 3 or big_enemies:
+                if len(items) <= 1:
+                    item_make = True
+            block_check()
 
-    if win_game and not paused and not dead:  # 打死 level 5 大型敵機，使用者獲勝，遊戲結束
-        screen.fill(BACKGROUND_COLOR)
+            if middle_make:
+                new_middle(level)
+                middle_make = False
+            if big_make:
+                new_big()
+                big_make = False
+            if item_make:
+                new_item()
+                item_make = False
 
-        draw_lines_animation()
+        if win_game and not paused and not dead:  # 打死 level 5 大型敵機，使用者獲勝，遊戲結束
+            screen.fill(BACKGROUND_COLOR)
 
-        for i in middle_enemies:
-            i.lives = 0
-        for i in small_enemies:
-            i.lives = 0
-        for i in blocks:
-            i.lives = 0
-        for i in bullets:
-            i.kill()
-        for i in barrages:
-            i.kill()
-        for i in items:
-            i.kill()
-        if player.rect.bottom < 0:
-            if len(all_sprites) <= 1:
-                player.kill()
+            draw_lines_animation()
+
+            for i in middle_enemies:
+                i.lives = 0
+            for i in small_enemies:
+                i.lives = 0
+            for i in blocks:
+                i.lives = 0
+            for i in bullets:
+                i.kill()
+            for i in barrages:
+                i.kill()
+            for i in items:
+                i.kill()
+            if player.rect.bottom < 0:
+                if len(all_sprites) <= 1:
+                    player.kill()
+                    all_sprites.update()
+                    all_sprites.draw(screen)
+                    pygame.display.update()
+                    going_back()
+            if player_group:
+                all_sprites.update(player)
+            else:
                 all_sprites.update()
-                all_sprites.draw(screen)
-                pygame.display.update()
-                going_back()
-        if player_group:
+            all_sprites.draw(screen)
+            pygame.display.update()
+
+        if not paused and not dead and not win_game:  # dead、pause 或 win_game 就會停止更新遊戲
             all_sprites.update(player)
-        else:
-            all_sprites.update()
-        all_sprites.draw(screen)
-        pygame.display.update()
+            frame_counter += 1
 
-    if not paused and not dead and not win_game:  # dead、pause 或 win_game 就會停止更新遊戲
-        all_sprites.update(player)
-        frame_counter += 1
+            if frame_counter >= collision_check_threshold:  # 限制碰撞判斷的計算次數
+                for b in bullets:
+                    for bl in blocks:
+                        if check_collision(b, bl):
+                            if type(b) == SpecialBullet and b.type in [6, 7]:
+                                bl.lives -= 3
+                            else:
+                                bl.lives -= 1
+                                b.play_ani = True
 
-        if frame_counter >= collision_check_threshold:  # 限制碰撞判斷的計算次數
-            for b in bullets:
-                for bl in blocks:
-                    if check_collision(b, bl):
-                        if type(b) == SpecialBullet and b.type in [6, 7]:
-                            bl.lives -= 3
-                        else:
-                            bl.lives -= 1
-                            b.play_ani = True
-
-            for b in bullets:
-                for s in small_enemies:
-                    if check_collision(b, s):  # 若 b 和 s 發生碰撞
-                        if type(b) == SpecialBullet and b.type in [6, 7]:  # 「環狀」和「大絕招」
-                            if not s.hit:
-                                if type(s) == SmallEnemy:
-                                    s.lives -= 3
-                                    s.hit = True
-                        else:
-                            b.play_ani = True
-                            if type(s) == SmallEnemy:
-                                s.lives -= 1
-                                s.hit = True
-                        if s.lives <= 0:
-                            enemy_explosion_sound.play()
-                            small_death += 1
-                            if small_death >= (5 + level):  # 打死大於 5 + level 的小型敵機就會生成中型敵機
-                                if len(middle_enemies) < (level if level <= 2 else 2) and not big_enemies:  # 每關同時間最多只會有 level 架中型敵機
-                                    middle_make = True
-
-            for b in bullets:
-                for m in middle_enemies:
-                    if check_collision(b, m):  # 若 b 和 m 發生碰撞
-                        if type(b) == SpecialBullet and b.type in [6, 7]:  # 「環狀」和「大絕招」
-                            if not m.hit:
-                                if type(m) == MiddleEnemy:
-                                    m.lives -= 3
-                                    m.hit = True
-                        else:
-                            b.play_ani = True
-                            if type(m) == MiddleEnemy:
-                                m.lives -= 1
-                                m.hit = True
-                        if m.lives <= 0:
-                            m.shoot(player)
-                            enemy_explosion_sound.play()
-                            middle_death += 1
-                            dice = random.randrange(0, 2 + player.lives)  # 玩家的 lives 越少，越容易掉道具
-                            if dice == 0:
-                                new_item(enemy=m)
-                            if middle_death >= (4 + level):  # 打死大於 4 + level 的中型敵機就會生成大型敵機
-                                if len(big_enemies) == 0:
-                                    big_make = True
-                                    middle_death = 0
-
-            for b in bullets:
-                for be in big_enemies:
-                    if check_collision(b, be):  # 若 b 和 be 發生碰撞
-                        if type(b) == SpecialBullet and b.type in [6, 7]:  # 「環狀」和「大絕招」
-                            if not be.hit:
-                                if type(be) == BigEnemy:
-                                    be.lives -= 3
-                                    be.hit = True
-                        else:
-                            b.play_ani = True
-                            enemy_explosion_sound.play()
-                            if type(be) == BigEnemy:
-                                be.lives -= 1
-                        if be.lives <= 0:
-                            be.shoot(player)
-
-            if player.can_hit:
-                for p in player_group:
+                for b in bullets:
                     for s in small_enemies:
-                        if check_collision(p, s):  # 若 p 和 s 發生碰撞
-                            player.lives -= 1
-                            if type(s) == SmallEnemy:
-                                s.lives -= 3
-                                player.can_hit = False
-
-                            if s.lives <= 0:  # 當小型敵機的 lives 屬性數值歸零，將該小型敵機從群組中移除
+                        if check_collision(b, s):  # 若 b 和 s 發生碰撞
+                            if type(b) == SpecialBullet and b.type in [6, 7]:  # 「環狀」和「大絕招」
+                                if not s.hit:
+                                    if type(s) == SmallEnemy:
+                                        s.lives -= 3
+                                        s.hit = True
+                            else:
+                                b.play_ani = True
+                                if type(s) == SmallEnemy:
+                                    s.lives -= 1
+                                    s.hit = True
+                            if s.lives <= 0:
                                 enemy_explosion_sound.play()
                                 small_death += 1
                                 if small_death >= (5 + level):  # 打死大於 5 + level 的小型敵機就會生成中型敵機
                                     if len(middle_enemies) < (level if level <= 2 else 2) and not big_enemies:  # 每關同時間最多只會有 level 架中型敵機
                                         middle_make = True
 
-                for p in player_group:
+                for b in bullets:
                     for m in middle_enemies:
-                        if check_collision(p, m):  # 若 p 和 m 發生碰撞
-                            player.lives -= 1
-                            if type(m) == MiddleEnemy:
-                                m.lives -= 3
-                                player.can_hit = False
-                                m.hit = True
-
+                        if check_collision(b, m):  # 若 b 和 m 發生碰撞
+                            if type(b) == SpecialBullet and b.type in [6, 7]:  # 「環狀」和「大絕招」
+                                if not m.hit:
+                                    if type(m) == MiddleEnemy:
+                                        m.lives -= 3
+                                        m.hit = True
+                            else:
+                                b.play_ani = True
+                                if type(m) == MiddleEnemy:
+                                    m.lives -= 1
+                                    m.hit = True
                             if m.lives <= 0:
+                                m.shoot(player)
                                 enemy_explosion_sound.play()
                                 middle_death += 1
                                 dice = random.randrange(0, 2 + player.lives)  # 玩家的 lives 越少，越容易掉道具
-                                if dice == 1:
+                                if dice == 0:
                                     new_item(enemy=m)
                                 if middle_death >= (4 + level):  # 打死大於 4 + level 的中型敵機就會生成大型敵機
                                     if len(big_enemies) == 0:
                                         big_make = True
                                         middle_death = 0
 
-                for p in player_group:
-                    for b in big_enemies:
-                        if check_collision(p, b):  # 若 p 和 b 發生碰撞
-                            player.lives -= 1
-                            if type(b) == BigEnemy:
-                                b.lives -= 3
-                                player.can_hit = False
-                            if b.lives <= 0:
+                for b in bullets:
+                    for be in big_enemies:
+                        if check_collision(b, be):  # 若 b 和 be 發生碰撞
+                            if type(b) == SpecialBullet and b.type in [6, 7]:  # 「環狀」和「大絕招」
+                                if not be.hit:
+                                    if type(be) == BigEnemy:
+                                        be.lives -= 3
+                                        be.hit = True
+                            else:
+                                b.play_ani = True
                                 enemy_explosion_sound.play()
+                                if type(be) == BigEnemy:
+                                    be.lives -= 1
+                            if be.lives <= 0:
+                                be.shoot(player)
 
+                if player.can_hit:
+                    for p in player_group:
+                        for s in small_enemies:
+                            if check_collision(p, s):  # 若 p 和 s 發生碰撞
+                                player.lives -= 1
+                                if type(s) == SmallEnemy:
+                                    s.lives -= 3
+                                    player.can_hit = False
+
+                                if s.lives <= 0:  # 當小型敵機的 lives 屬性數值歸零，將該小型敵機從群組中移除
+                                    enemy_explosion_sound.play()
+                                    small_death += 1
+                                    if small_death >= (5 + level):  # 打死大於 5 + level 的小型敵機就會生成中型敵機
+                                        if len(middle_enemies) < (level if level <= 2 else 2) and not big_enemies:  # 每關同時間最多只會有 level 架中型敵機
+                                            middle_make = True
+
+                    for p in player_group:
+                        for m in middle_enemies:
+                            if check_collision(p, m):  # 若 p 和 m 發生碰撞
+                                player.lives -= 1
+                                if type(m) == MiddleEnemy:
+                                    m.lives -= 3
+                                    player.can_hit = False
+                                    m.hit = True
+
+                                if m.lives <= 0:
+                                    enemy_explosion_sound.play()
+                                    middle_death += 1
+                                    dice = random.randrange(0, 2 + player.lives)  # 玩家的 lives 越少，越容易掉道具
+                                    if dice == 1:
+                                        new_item(enemy=m)
+                                    if middle_death >= (4 + level):  # 打死大於 4 + level 的中型敵機就會生成大型敵機
+                                        if len(big_enemies) == 0:
+                                            big_make = True
+                                            middle_death = 0
+
+                    for p in player_group:
+                        for b in big_enemies:
+                            if check_collision(p, b):  # 若 p 和 b 發生碰撞
+                                player.lives -= 1
+                                if type(b) == BigEnemy:
+                                    b.lives -= 3
+                                    player.can_hit = False
+                                if b.lives <= 0:
+                                    enemy_explosion_sound.play()
+
+                    for p in player_group:
+                        for br in barrages:
+                            if check_collision(p, br):  # 若 p 和 br 發生碰撞
+                                player.lives -= 1
+                                player.can_hit = False
+                                br.kill()
+
+                    for p in player_group:
+                        for b in blocks:
+                            if check_collision(p, b):
+                                enemy_explosion_sound.play()
+                                b.lives -= 1
+                                player.can_hit = False
+                                player.lives -= 1
+                # player.can_hit 的條件判斷到此為止
                 for p in player_group:
-                    for br in barrages:
-                        if check_collision(p, br):  # 若 p 和 br 發生碰撞
-                            player.lives -= 1
-                            player.can_hit = False
-                            br.kill()
+                    for i in items:
+                        if check_collision(p, i):  # 若 p 和 i 發生碰撞
+                            i.kill()
+                            item_get_sound.play()
+                            if i.type == 1 and player.lives + 1 <= 3:
+                                player.lives += 1
+                            elif i.type == 3:
+                                player.speed_up()
+                            elif i.type in [2, 4, 5, 6, 7, 8]:
+                                player.gun_up(i.type)
 
-                for p in player_group:
-                    for b in blocks:
-                        if check_collision(p, b):
-                            enemy_explosion_sound.play()
-                            b.lives -= 1
-                            player.can_hit = False
-                            player.lives -= 1
-            # player.can_hit 的條件判斷到此為止
-            for p in player_group:
-                for i in items:
-                    if check_collision(p, i):  # 若 p 和 i 發生碰撞
-                        i.kill()
-                        item_get_sound.play()
-                        if i.type == 1 and player.lives + 1 <= 3:
-                            player.lives += 1
-                        elif i.type == 3:
-                            player.speed_up()
-                        elif i.type in [2, 4, 5, 6, 7, 8]:
-                            player.gun_up(i.type)
+                frame_counter = 0  # 檢查碰撞判斷後就重置計數器
 
-            frame_counter = 0  # 檢查碰撞判斷後就重置計數器
+            # ******畫面顯示******
+            screen.fill(BACKGROUND_COLOR)  # 給 screen 填滿顏色
 
-        # ******畫面顯示******
-        screen.fill(BACKGROUND_COLOR)  # 給 screen 填滿顏色
+            line_frame_count += 1
+            draw_lines_animation()
 
-        line_frame_count += 1
-        draw_lines_animation()
+            all_sprites.draw(screen)  # 指定畫在 screen 平面上
 
-        all_sprites.draw(screen)  # 指定畫在 screen 平面上
+            if small_enemies:  # 畫出敵機的 lives
+                draw_enemy_lives(small_enemies)
+            if middle_enemies:
+                draw_enemy_lives(middle_enemies)
+            if big_enemies:
+                draw_enemy_lives(big_enemies)
 
-        if small_enemies:  # 畫出敵機的 lives
-            draw_enemy_lives(small_enemies)
-        if middle_enemies:
-            draw_enemy_lives(middle_enemies)
-        if big_enemies:
-            draw_enemy_lives(big_enemies)
+            for b in bullets:
+                if type(b) == SpecialBullet and b.type in [6, 7]:
+                    b.update(player)
 
-        for b in bullets:
-            if type(b) == SpecialBullet and b.type in [6, 7]:
-                b.update(player)
+            draw_player_lives(screen, player)
+            draw_level(screen)  # 顯示當前關卡
 
-        draw_player_lives(screen, player)
-        draw_level(screen)  # 顯示當前關卡
+            pygame.display.update()
+    pygame.quit()
 
-        pygame.display.update()
-    
-pygame.quit()
-
+    await asyncio.sleep(0)
+asyncio.run(main())
