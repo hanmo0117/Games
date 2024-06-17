@@ -2330,7 +2330,7 @@ while running:
                         if be.lives <= 0:
                             be.shoot(player)
 
-            if player.can_hit:
+            '''if player.can_hit:
                 for p in player_group:
                     for s in small_enemies:
                         if check_collision(p, s):  # 若 p 和 s 發生碰撞
@@ -2389,7 +2389,7 @@ while running:
                             enemy_explosion_sound.play()
                             b.lives -= 1
                             player.can_hit = False
-                            player.lives -= 1
+                            player.lives -= 1'''
             # player.can_hit 的條件判斷到此為止
             for p in player_group:
                 for i in items:
